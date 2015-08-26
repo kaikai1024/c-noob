@@ -1,3 +1,16 @@
+/*
+*
+*\file                  get_pkt.c
+*\brief                 源文件
+*\detail				获得数据包
+*
+*\author				冯开开
+*\version				v1
+*\date					2015.8.25
+*
+*/
+#include "debug.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>  
@@ -11,31 +24,47 @@
 #include <net/if.h>
 
 #define BUF_SIZE (2048)
+#define SUCCESS  (0)
+#define FAULSE   (-1)
 
 int set_promisc(char *nif, int sock);
 
 int main()  
 {  
-	char buf[BUF_SIZE] = {0}; 
-	int	 sock = 0;
-	unsigned int len = 0; 
+	char buf[BUF_SIZE] 	= {0}; 
+	int	 sock 			= 0;
+	int  promisc_flag	= 0;
+	int  len 			= 0; 
 
 	/*建立socke,*/
 	sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL)) ;
 	if(-1 == sock) 
-		debug(-1, "socket");  
+	{
+		IPIKE_CFG_INFO_ERROR("socket");  
+	}
 
-	debug(set_promisc("eth0", sock), "set_promisc"); 
+	promisc_flag = set_promisc("eth0", sock) ; 
+	promisc_flag = set_promisc("eth1", sock) ; 
+	if(-1 == promisc_flag)
+	{
+		IPIKE_CFG_INFO_ERROR("set_promisc failed"); 
+	}
+
 	system("ifconfig");
 
 	while(1)
 	{	
 		memset(buf , 0, BUF_SIZE);
 		len = recvfrom(sock, buf, BUF_SIZE, 0, NULL, NULL);
-		debug(len, "recvfrom");
+		if( -1 == len)
+		{
+			IPIKE_CFG_INFO_ERROR("receive nothing");  
+			return FAULSE;
+		}
+		IPIKE_CFG_INFO_INFO("recvfrom:%d", len);
 
 		analy_pkt(buf, len);
-		 
+		sleep(1);
 		perror("dump");
 	} 
  
@@ -47,19 +76,20 @@ int set_promisc(char *nif, int sock )
                 
 	memset(&ifr, 0, sizeof(ifr));
 	strncpy(ifr.ifr_name, nif, strlen(nif) + 1);
-
-	if(-1 == (ioctl(sock, SIOCGIFFLAGS, &ifr)))  //获得flag
+ 
+	if(-1 == (ioctl(sock, SIOCGIFFLAGS, &ifr)))  
 	{         
-		debug(-1, "ioctl_before");  
-		return -1;
+		IPIKE_CFG_INFO_ERROR( "ioctl_before");  
+		return FAULSE;
 	}  
    
-	ifr.ifr_flags |= IFF_PROMISC;  //重置flag标志
+	ifr.ifr_flags |= IFF_PROMISC;  
   
-	if(-1 == ioctl(sock, SIOCSIFFLAGS, &ifr))  //改变模式
+	if(-1 == ioctl(sock, SIOCSIFFLAGS, &ifr)) 
 	{ 
-		debug(-1, "ioctl_after");  
-		return -1;
+		IPIKE_CFG_INFO_ERROR( "ioctl_after");  
+		return FAULSE;
 	}  
-	return 0;
+
+	return SUCCESS;
 }  
